@@ -14,38 +14,56 @@
  * Иногда промисы от API будут приходить в состояние rejected, (прямо как и API в реальной жизни)
  * Ответ будет приходить в поле {result}
  */
- import Api from '../tools/api';
+import Api from '../tools/api';
+import * as R from "ramda";
 
- const api = new Api();
+const api = new Api();
 
- /**
-  * Я – пример, удали меня
-  */
- const wait = time => new Promise(resolve => {
-     setTimeout(resolve, time);
- })
+const validateString = (string) => {
+    const predicates = [
+        s => s.length < 10,
+        s => s.length > 2,
+        s => s !== '0',
+        s => /^\d*\.?\d+$/.test(s)
+    ];
 
- const processSequence = ({value, writeLog, handleSuccess, handleError}) => {
-     /**
-      * Я – пример, удали меня
-      */
-     writeLog(value);
+    return R.allPass(predicates)(string);
+}
 
-     api.get('https://api.tech/numbers/base', {from: 2, to: 10, number: '01011010101'}).then(({result}) => {
-         writeLog(result);
-     });
+const pipeWithLogResult = (writeLog, functions) =>
+    R.pipeWith(async (f, res) => {
+        const result = await f(await res);
+        writeLog(result);
+        return result;
+    })(functions);
 
-     wait(2500).then(() => {
-         writeLog('SecondLog')
+const processSequence = ({ value, writeLog, handleSuccess, handleError }) => {
+    writeLog(value);
 
-         return wait(1500);
-     }).then(() => {
-         writeLog('ThirdLog');
+    if (!validateString(value)) return handleError('ValidationError');
 
-         return wait(400);
-     }).then(() => {
-         handleSuccess('Done');
-     });
- }
+    pipeWithLogResult(writeLog, [
+        initial => parseFloat(initial),
+        value => Math.round(value),
+        async (value) => {
+            const {result} = await api.get('https://api.tech/numbers/base', {
+                from: 10,
+                to: 2,
+                number: value
+            });
+            return result;
+        },
+        binary => binary.length,
+        length => length ** 2,
+        squared => squared % 3,
+    ])(value)
+        .then(async (result) => {
+            const {result: animal} = await api.get(`https://animals.tech/${result}`, {});
+            handleSuccess(animal);
+        })
+        .catch(error => {
+            handleError(error);
+        });
+};
 
 export default processSequence;
