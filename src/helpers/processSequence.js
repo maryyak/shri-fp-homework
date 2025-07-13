@@ -23,8 +23,8 @@ const validateString = (string) => {
     const predicates = [
         s => s.length < 10,
         s => s.length > 2,
-        s => s !== '0',
-        s => /^\d*\.?\d+$/.test(s)
+        s => /^\d*\.?\d+$/.test(s),
+        s => parseFloat(s) > 0
     ];
 
     return R.allPass(predicates)(string);
